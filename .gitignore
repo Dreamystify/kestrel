@@ -1,0 +1,11 @@
+# Dependency directories
+node_modules/
+coverage/
+.nyc_output/
+lib/
+typings/
+.DS_Store
+.env
+.vscode/
+.archive/
+.cursor/
