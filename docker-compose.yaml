@@ -1,0 +1,155 @@
+
+services:
+
+  redis-standalone:
+    image: redis:7.0.2
+    container_name: redis-standalone
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--requirepass", "kestrel"]
+    networks:
+      - redis
+
+  redis-sentinel-master:
+    image: redis:7.0.2
+    container_name: redis-sentinel-master
+    ports:
+      - "6380:6379"
+    command: ["redis-server", "--requirepass", "kestrel"]
+    networks:
+      - redis_sentinel
+
+  redis-sentinel-slave:
+    image: redis:7.0.2
+    container_name: redis-sentinel-slave
+    depends_on:
+      - redis-sentinel-master
+    ports:
+      - "6381:6379"
+    command: [
+      "redis-server",
+      "--slaveof", "redis-sentinel-master", "6379",
+      "--masterauth", "kestrel",
+      "--requirepass", "kestrel"
+    ]
+    networks:
+      - redis_sentinel
+
+  redis-sentinel:
+    image: redis:7.0.2
+    container_name: redis-sentinel
+    depends_on:
+      - redis-sentinel-master
+      - redis-sentinel-slave
+    ports:
+      - "26379:26379"
+    command: ["redis-sentinel", "/usr/local/etc/redis/sentinel.conf"]
+    volumes:
+      - ./.data/sentinel/sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    networks:
+      - redis_sentinel
+
+  sentinel-test:
+    image: node:20.18.0
+    container_name: sentinel-test
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: ["node", "tests/sentinel.js"]
+    networks:
+      - redis_sentinel
+
+  redis-cluster-node1:
+    image: redis:7.0.2
+    container_name: redis-cluster-node1
+    ports:
+      - "7001:6379"
+    command: [
+      "redis-server",
+      "--cluster-enabled", "yes",
+      "--cluster-config-file", "/data/nodes.conf",
+      "--cluster-node-timeout", "5000",
+      "--appendonly", "yes",
+      "--requirepass", "kestrel"
+    ]
+    volumes:
+      - type: tmpfs
+        target: /data
+    networks:
+      - redis_cluster
+
+  redis-cluster-node2:
+    image: redis:7.0.2
+    container_name: redis-cluster-node2
+    ports:
+      - "7002:6379"
+    command: [
+      "redis-server",
+      "--cluster-enabled", "yes",
+      "--cluster-config-file", "/data/nodes.conf",
+      "--cluster-node-timeout", "5000",
+      "--appendonly", "yes",
+      "--requirepass", "kestrel"
+    ]
+    volumes:
+      - type: tmpfs
+        target: /data
+    networks:
+      - redis_cluster
+
+  redis-cluster-node3:
+    image: redis:7.0.2
+    container_name: redis-cluster-node3
+    ports:
+      - "7003:6379"
+    command: [
+      "redis-server",
+      "--cluster-enabled", "yes",
+      "--cluster-config-file", "/data/nodes.conf",
+      "--cluster-node-timeout", "5000",
+      "--appendonly", "yes",
+      "--requirepass", "kestrel"
+    ]
+    volumes:
+      - type: tmpfs
+        target: /data
+    networks:
+      - redis_cluster
+
+  # A one-time service to create the cluster topology
+  redis-cluster-setup:
+    image: redis:7.0.2
+    container_name: redis-cluster-setup
+    depends_on:
+      - redis-cluster-node1
+      - redis-cluster-node2
+      - redis-cluster-node3
+    networks:
+      - redis_cluster
+    entrypoint: >
+      sh -c "sleep 5 && echo yes | redis-cli --cluster create \
+      redis-cluster-node1:6379 \
+      redis-cluster-node2:6379 \
+      redis-cluster-node3:6379 \
+      --cluster-replicas 0 -a kestrel  && sleep 5"
+
+  cluster-test:
+    image: node:20.18.0
+    container_name: cluster-test
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: ["node", "tests/cluster.js"]
+    networks:
+      - redis_cluster
+
+networks:
+  redis:
+    driver: bridge
+    name: redis
+  redis_sentinel:
+    driver: bridge
+    name: redis_sentinel
+  redis_cluster:
+    driver: bridge
+    name: redis_cluster
