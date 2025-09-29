@@ -1,0 +1,133 @@
+{
+  "name": "@dreamystify/kestrel",
+  "version": "0.0.0",
+  "description": "A distributed, k-sortable unique ID generation system using Redis and Lua, inspired by Icicle.",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./lib/index.js",
+      "types": "./lib/index.d.ts"
+    }
+  },
+  "files": [
+    "lib/**/*"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepublishOnly": "npm run build",
+    "build": "npm run clean && npm run build:esbuild && npm run build:types",
+    "build:esbuild": "npm run clean && npx tsx esbuild.config.ts",
+    "build:types": "tsc -p tsconfig.build.json",
+    "lint": "npm run lint:md && npm run lint:mdc",
+    "lint:md": "markdownlint 'docs/**/*.md' 'README.md' --fix",
+    "lint:md:check": "markdownlint 'docs/**/*.md' 'README.md'",
+    "lint:mdc": "markdownlint '**/*.mdc' --fix",
+    "lint:mdc:check": "markdownlint '**/*.mdc'",
+    "format": "prettier --write --log-level silent \"**/*.md\" \"**/*.mdc\"",
+    "format:md": "prettier --write --log-level silent \"**/*.md\"",
+    "format:mdc": "prettier --write \"**/*.mdc\"",
+    "format:check": "prettier --check \"**/*.md\" \"**/*.mdc\"",
+    "clean": "rm -rf lib",
+    "test": "jest",
+    "coverage": "jest --coverage"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dreamystify/kestrel.git"
+  },
+  "keywords": [
+    "k-sortable",
+    "id",
+    "generator",
+    "bigint"
+  ],
+  "author": "Dreamystify",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Dreamystify/kestrel/issues"
+  },
+  "homepage": "https://github.com/Dreamystify/kestrel#readme",
+  "devDependencies": {
+    "@istanbuljs/nyc-config-typescript": "^1.0.2",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.3",
+    "@semantic-release/npm": "^12.0.2",
+    "@semantic-release/release-notes-generator": "^14.0.3",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.6.0",
+    "esbuild": "^0.25.10",
+    "jest": "^30.2.0",
+    "markdownlint-cli": "^0.45.0",
+    "nyc": "^17.1.0",
+    "prettier": "^3.6.2",
+    "semantic-release": "^24.2.7",
+    "source-map-support": "^0.5.21",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.1.6"
+  },
+  "dependencies": {
+    "big-integer": "^1.6.51",
+    "ioredis": "^5.4.2",
+    "redis": "^5.8.2"
+  },
+  "jest": {
+    "preset": "ts-jest/presets/default-esm",
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
+    "testEnvironment": "node",
+    "testTimeout": 10000,
+    "roots": [
+      "tests"
+    ],
+    "clearMocks": true,
+    "coverageProvider": "v8",
+    "collectCoverage": true,
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/**/*.d.ts"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "json",
+      "text",
+      "lcov",
+      "clover"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 75,
+        "functions": 75,
+        "lines": 85,
+        "statements": 85
+      }
+    },
+    "testMatch": [
+      "<rootDir>/tests/**/*.spec.ts"
+    ],
+    "transform": {
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "useESM": true,
+          "tsconfig": "<rootDir>/tsconfig.jest.json"
+        }
+      ]
+    },
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    },
+    "forceExit": true
+  }
+}

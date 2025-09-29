@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      issues: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.5.0'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Start Redis
+        uses: supercharge/redis-github-action@1.4.0
+        with:
+          redis-version: 7
+          redis-port: 6379
+
+      - name: Test
+        run: npm run coverage
+
+      - name: Release
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_ENV: production
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npx semantic-release
+
+      - name: Check if new release was created
+        id: check-release
+        run: |
+          # Get the latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          
+          # Check if this is a new tag (not the one we started with)
+          if [[ "$LATEST_TAG" != "none" && "$LATEST_TAG" != "v0.1.0" ]]; then
+            echo "new_release=true" >> $GITHUB_OUTPUT
+            echo "release_version=$LATEST_TAG" >> $GITHUB_OUTPUT
+            
+            # Determine release type by comparing with previous version
+            # Get the previous tag (second to last)
+            PREVIOUS_TAG=$(git tag --sort=-version:refname | head -2 | tail -1 2>/dev/null || echo "v0.0.0")
+            
+            # Extract version numbers
+            NEW_MAJOR=$(echo "$LATEST_TAG" | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\1/')
+            NEW_MINOR=$(echo "$LATEST_TAG" | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\2/')
+            NEW_PATCH=$(echo "$LATEST_TAG" | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\3/')
+            
+            PREV_MAJOR=$(echo "$PREVIOUS_TAG" | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\1/')
+            PREV_MINOR=$(echo "$PREVIOUS_TAG" | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\2/')
+            PREV_PATCH=$(echo "$PREVIOUS_TAG" | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\3/')
+            
+            # Determine release type
+            if [[ "$NEW_MAJOR" -gt "$PREV_MAJOR" ]]; then
+              echo "release_type=major" >> $GITHUB_OUTPUT
+            elif [[ "$NEW_MINOR" -gt "$PREV_MINOR" ]]; then
+              echo "release_type=minor" >> $GITHUB_OUTPUT
+            elif [[ "$NEW_PATCH" -gt "$PREV_PATCH" ]]; then
+              echo "release_type=patch" >> $GITHUB_OUTPUT
+            else
+              echo "release_type=unknown" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "new_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set Capitalized Job Name
+        run: echo "CAPITALIZED_JOB=$(echo '${{ github.job }}' | sed 's/^./\U&/')" >> $GITHUB_ENV
+  
+      - name: Report Status
+        if: always() && (steps.check-release.outputs.new_release == 'true' || job.status == 'failure')
+        uses: ravsamhq/notify-slack-action@v2
+        with:
+          notify_when: 'success,failure'
+          status: ${{ job.status }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          notification_title: |
+            Kestrel Library has {status_message} ${{ steps.check-release.outputs.new_release == 'true' && format('- New {0} release: {1}', steps.check-release.outputs.release_type, steps.check-release.outputs.release_version) || '' }}
+          message_format: |
+            Release Details:
+            Package: <{repo_url}|{repo}>
+            Status: {status_message}
+            Workflow: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>
+            ${{ steps.check-release.outputs.new_release == 'true' && format('Version: {0}', steps.check-release.outputs.release_version) || '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }} 

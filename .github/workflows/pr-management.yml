@@ -1,0 +1,76 @@
+name: PR Management
+
+on:
+  pull_request:
+    types:
+        - opened
+        - synchronize
+        - reopened
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  assign-reviewers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto-assign pull request author
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addAssignees({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              assignees: [context.actor]
+            })
+
+  create-summary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: false
+
+      - name: Fetch all branches
+        run: git fetch --all
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Setup npmrc for ByteSafe
+        run: |
+          echo "//dreamystify.bytesafe.dev/r/dreamystify/:_authToken=${{ secrets.BYTESAFE_TOKEN }}" > .npmrc
+          echo "@dreamystify:registry=https://dreamystify.bytesafe.dev/r/dreamystify/" >> .npmrc
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate grouped PR Summary (release-please style)
+        id: generate_summary
+        run: |
+          SUMMARY=$(./.scripts/generate-pr-summary.sh origin/main HEAD)
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          echo "$SUMMARY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update PR Description
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const summary = `${{ steps.generate_summary.outputs.summary }}`;
+            if (!summary.trim()) {
+              console.log('No summary to post.');
+              return;
+            }
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              body: summary
+            });
+            console.log('Replaced PR description with summary');
