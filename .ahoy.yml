@@ -1,0 +1,128 @@
+ahoyapi: v2
+commands:
+  -h:
+    desc: Show help
+    usage: Show help
+    cmd: |
+      clear
+      ahoy --help
+
+  format:
+    desc: Format code and docs or check formatting
+    usage: Interactively format or check code and documentation formatting
+    cmd: |
+      source ./.scripts/utils/gum.sh
+      set -e
+      clear
+
+      ACTION=$(gum_choose "Select formatting action:" "All" "Markdown" "Cursor Rules")
+      if [ "$ACTION" = "All" ]; then
+        gum_style "Formatting all files with Prettier..." --foreground 46 --bold
+        npm run format
+      elif [ "$ACTION" = "Markdown" ]; then
+        gum_style "Formatting markdown files with Prettier..." --foreground 33 --bold
+        npm run format:md
+      else
+        gum_style "Formatting cursor rules with Prettier..." --foreground 33 --bold
+        npm run format:mdc
+      fi
+
+  lint:
+    desc: Lint code and docs or check linting
+    usage: Interactively lint or check code and documentation linting
+    cmd: |
+      source ./.scripts/utils/gum.sh
+      set -e
+      clear
+
+      ACTION=$(gum_choose "Select linting action:" "All" "Markdown" "Cursor Rules" "Check Only")
+      if [ "$ACTION" = "All" ]; then
+        gum_style "Linting all files..." --foreground 46 --bold
+        npm run lint
+      elif [ "$ACTION" = "Markdown" ]; then
+        gum_style "Linting markdown files..." --foreground 33 --bold
+        npm run lint:md
+      elif [ "$ACTION" = "Cursor Rules" ]; then
+        gum_style "Linting cursor rules files..." --foreground 33 --bold
+        npm run lint:mdc
+      else
+        gum_style "Checking all linting..." --foreground 33 --bold
+        npm run lint:md:check && npm run lint:mdc:check
+      fi
+  
+  clean:
+    usage: Cleans files and folders
+    cmd: |
+      # Import functions
+      source ./.scripts/utils/gum.sh
+      
+      # Clear the coverage folders
+      gum_spin "Running npm clean script..." rm -rf .nyc_output coverage
+
+      # Run the npm clean script
+      gum_spin "Running npm clean script..." npm run clean
+
+      # Clean the npm_modules folder
+      gum_spin "Clearing the npm modules folder..." rm -rf node_modules
+
+  build:
+    usage: Builds the package
+    cmd: |
+      npm run build
+
+  test:
+    usage: Tests the package
+    cmd: |
+      npm test
+
+  coverage:
+    usage: Runs the coverage
+    cmd: |
+      npm run coverage
+
+  workflow:
+    usage: Tests the github publish workflow
+    cmd: |
+      # Import the environment variables
+      set -a
+      [ -f .env ] && source .env
+
+      # Remove the redis containers
+      docker rm -f $(docker ps -aq --filter "name=redis-build-test-")
+
+      # Run the workflow
+      act -W .github/workflows/publish.yaml \
+      -s SLACK_WEBHOOK_URL=$SLACK_WEBHOOK_URL \
+      -s DOCKERHUB_USERNAME=$DOCKERHUB_USERNAME \
+      -s DOCKERHUB_TOKEN=$DOCKERHUB_TOKEN
+
+      # act -W .github/workflows/publish.yaml --env-file .env
+
+  start:
+    usage: Up the docker containers
+    cmd: |
+      clear
+      npm run build
+      docker compose up -d
+
+  stop:
+    usage: Down the docker containers
+    cmd: |
+      clear
+      docker compose down
+      
+  restart:
+    usage: Restart the docker containers
+    cmd: |
+      clear
+      docker compose down
+      npm run build
+      docker compose up -d
+      clear
+
+  logs:
+    usage: Show the docker logs
+    cmd: |
+      clear
+      docker logs sentinel-test
+      docker logs cluster-test
