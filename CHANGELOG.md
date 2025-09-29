@@ -1,3 +1,18 @@
+# 1.0.0 (2025-09-29)
+
+
+### Bug Fixes
+
+* remove registry configuration from PR workflow ([d00d450](https://github.com/Dreamystify/kestrel/commit/d00d4508d62c3a40ea4da2943e47aa00d063d541))
+* remove sensitive registry configuration from PR workflow ([24ca190](https://github.com/Dreamystify/kestrel/commit/24ca19090837b7c1c48e84a01f619641078efad7))
+
+
+### Features
+
+* add Kestrel source code and test suite ([099f54e](https://github.com/Dreamystify/kestrel/commit/099f54edd632c272735acb035e0be09887d229b5))
+* complete repository initialization with comprehensive development setup ([28e804b](https://github.com/Dreamystify/kestrel/commit/28e804b34062e783b3049378606d6626fc54ae12))
+* initialize repository with updated dependencies and markdown linting ([e913aae](https://github.com/Dreamystify/kestrel/commit/e913aae0f2b40aef35a37891d57f4b0503d7a97b))
+
 # [2.0.0](https://github.com/Dreamystify/fingrprint/compare/v1.0.1...v2.0.0) (2025-09-28)
 
 
