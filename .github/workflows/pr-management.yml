@@ -42,11 +42,6 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Setup npmrc for ByteSafe
-        run: |
-          echo "//dreamystify.bytesafe.dev/r/dreamystify/:_authToken=${{ secrets.BYTESAFE_TOKEN }}" > .npmrc
-          echo "@dreamystify:registry=https://dreamystify.bytesafe.dev/r/dreamystify/" >> .npmrc
-
       - name: Install dependencies
         run: npm ci
 
