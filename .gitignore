@@ -8,4 +8,4 @@ typings/
 .env
 .vscode/
 .archive/
-.cursor/
+.cursor/**
