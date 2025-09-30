@@ -7,10 +7,10 @@
   </p>
   <p>
   <a href="https://badge.fury.io/js/@dreamystify%2Fkestrel ">
-    <img src="https://badge.fury.io/js/@dreamystify%2Fkestrel .svg" alt="npm version" height="18">
+    <img src="https://badge.fury.io/js/@dreamystify%2Fkestrel.svg" alt="npm version" height="18">
   </a>
   <a href='https://coveralls.io/github/Dreamystify/kestrel ?branch=main'>
-    <img src='https://coveralls.io/repos/github/Dreamystify/kestrel /badge.svg?branch=main'
+    <img src='https://coveralls.io/repos/github/Dreamystify/kestrel/badge.svg?branch=main'
          alt='Coverage Status' height="18"/>
   </a>
 
