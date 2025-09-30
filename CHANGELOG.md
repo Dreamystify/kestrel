@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/Dreamystify/kestrel/compare/v1.0.0...v1.0.1) (2025-09-30)
+
+
+### Bug Fixes
+
+* update badge URLs in README.md for correct formatting ([dfecf56](https://github.com/Dreamystify/kestrel/commit/dfecf56a11b3bfcebbb0fe2d007bbb49cbfa4fe9))
+
 # 1.0.0 (2025-09-29)
 
 
