@@ -6,7 +6,7 @@
     A distributed, k-sortable unique ID generation system using Redis and Lua, inspired by Icicle.
   </p>
   <p>
-  <a href="https://badge.fury.io/js/@dreamystify%2Fkestrel ">
+  <a href="https://badge.fury.io/js/@dreamystify%2Fkestrel">
     <img src="https://badge.fury.io/js/@dreamystify%2Fkestrel.svg" alt="npm version" height="18">
   </a>
   <a href='https://coveralls.io/github/Dreamystify/kestrel ?branch=main'>
