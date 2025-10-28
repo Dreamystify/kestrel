@@ -1,3 +1,11 @@
+# [1.1.0](https://github.com/Dreamystify/kestrel/compare/v1.0.1...v1.1.0) (2025-10-28)
+
+
+### Features
+
+* **build:** add CommonJS support alongside existing ESM ([248a647](https://github.com/Dreamystify/kestrel/commit/248a6477b77a53d0d21ad913558249a583622587))
+* **build:** enable dual-format CommonJS and ESM output ([687d685](https://github.com/Dreamystify/kestrel/commit/687d6854821d9296db8cc86bd489a2aa4ce70b9d))
+
 ## [1.0.1](https://github.com/Dreamystify/kestrel/compare/v1.0.0...v1.0.1) (2025-09-30)
 
 
