@@ -2,13 +2,14 @@
   "name": "@dreamystify/kestrel",
   "version": "1.0.1",
   "description": "A distributed, k-sortable unique ID generation system using Redis and Lua, inspired by Icicle.",
-  "type": "module",
   "main": "lib/index.js",
+  "module": "lib/index.js",
   "types": "lib/index.d.ts",
   "exports": {
     ".": {
+      "types": "./lib/index.d.ts",
       "import": "./lib/index.js",
-      "types": "./lib/index.d.ts"
+      "require": "./lib/index.js"
     }
   },
   "files": [
@@ -19,9 +20,7 @@
   },
   "scripts": {
     "prepublishOnly": "npm run build",
-    "build": "npm run clean && npm run build:esbuild && npm run build:types",
-    "build:esbuild": "npm run clean && npx tsx esbuild.config.ts",
-    "build:types": "tsc -p tsconfig.build.json",
+    "build": "npm run clean && tsup",
     "lint": "npm run lint:md && npm run lint:mdc",
     "lint:md": "markdownlint 'docs/**/*.md' 'README.md' --fix",
     "lint:md:check": "markdownlint 'docs/**/*.md' 'README.md'",
@@ -61,7 +60,6 @@
     "@semantic-release/release-notes-generator": "^14.0.3",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.6.0",
-    "esbuild": "^0.25.10",
     "jest": "^30.2.0",
     "markdownlint-cli": "^0.45.0",
     "nyc": "^17.1.0",
@@ -70,7 +68,7 @@
     "source-map-support": "^0.5.21",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.1",
-    "tsx": "^4.20.6",
+    "tsup": "^8.5.0",
     "typescript": "^5.1.6"
   },
   "dependencies": {
