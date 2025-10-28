@@ -41,6 +41,9 @@
       }
     }],
     "@semantic-release/changelog",
+    ["@semantic-release/exec", {
+      "prepareCmd": "markdownlint CHANGELOG.md --fix || true"
+    }],
     [
       "@semantic-release/npm",
       {
