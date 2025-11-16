@@ -3,12 +3,12 @@
   "version": "1.1.2",
   "description": "A distributed, k-sortable unique ID generation system using Redis and Lua, inspired by Icicle.",
   "main": "lib/index.js",
-  "module": "lib/index.js",
+  "module": "lib/index.mjs",
   "types": "lib/index.d.ts",
   "exports": {
     ".": {
       "types": "./lib/index.d.ts",
-      "import": "./lib/index.js",
+      "import": "./lib/index.mjs",
       "require": "./lib/index.js"
     }
   },

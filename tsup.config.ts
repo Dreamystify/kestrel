@@ -35,8 +35,8 @@ export default defineConfig({
   external: ['ioredis', 'big-integer', 'redis'],
   outExtension({ format }) {
     return {
-      js: '.js',
-    };
+      js: format === 'cjs' ? '.js' : '.mjs',
+    }
   },
   async onSuccess() {
     // Copy the Lua script to the lib directory
