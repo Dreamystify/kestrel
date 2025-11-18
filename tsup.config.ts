@@ -9,8 +9,6 @@
  */
 
 import { defineConfig } from 'tsup';
-import { copyFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
 
 export default defineConfig({
   entry: ['src/index.ts'],
@@ -37,13 +35,6 @@ export default defineConfig({
     return {
       js: format === 'cjs' ? '.js' : '.mjs',
     }
-  },
-  async onSuccess() {
-    // Copy the Lua script to the lib directory
-    const scriptsDir = join('lib', 'scripts');
-    mkdirSync(scriptsDir, { recursive: true });
-    copyFileSync('src/scripts/generateIds.lua', join(scriptsDir, 'generateIds.lua'));
-    console.log(`📄 Copied Lua script to ${scriptsDir}/generateIds.lua`);
   },
 });
 
