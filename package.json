@@ -1,6 +1,6 @@
 {
   "name": "@dreamystify/kestrel",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "A distributed, k-sortable unique ID generation system using Redis and Lua, inspired by Icicle.",
   "main": "lib/index.js",
   "module": "lib/index.mjs",

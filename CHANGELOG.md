@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/Dreamystify/kestrel/compare/v1.2.0...v1.2.1) (2025-11-18)
+
+### Bug Fixes
+
+* **build:** embed lua script to resolve path issues ([930e757](https://github.com/Dreamystify/kestrel/commit/930e757f6d011db2b8b15c61fd375a1e822b9122))
+* **build:** embed lua script to resolve path issues ([41180d3](https://github.com/Dreamystify/kestrel/commit/41180d35931b8c75f1fb0c834851521f5575fdc7))
+
 # [1.2.0](https://github.com/Dreamystify/kestrel/compare/v1.1.2...v1.2.0) (2025-11-16)
 
 ### Features
