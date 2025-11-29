@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/Dreamystify/kestrel/compare/v1.2.1...v1.3.0) (2025-11-29)
+
+### Features
+
+* **decode:** add decodeId and decodeIds methods with improvements ([3648191](https://github.com/Dreamystify/kestrel/commit/3648191244eb03e7b8a897bd128da7360a3e9216))
+* **decode:** add decodeId and decodeIds methods ([75a6ce5](https://github.com/Dreamystify/kestrel/commit/75a6ce5ab3de3216312f1b1d68ffe44eee18590a))
+
 ## [1.2.1](https://github.com/Dreamystify/kestrel/compare/v1.2.0...v1.2.1) (2025-11-18)
 
 ### Bug Fixes
