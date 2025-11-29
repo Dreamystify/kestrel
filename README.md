@@ -160,6 +160,48 @@ to see the assigned shard IDs:
 docker run -it --rm --network redis_cluster redis:7.0.2 redis-cli -a yourPassword --cluster call redis-cluster-node1:6379 GET '{kestrel}-shard-id'
 ```
 
+### Decoding IDs
+
+Kestrel IDs can be decoded back into their component parts, allowing you to
+extract information like when the ID was created, which shard generated it,
+and the sequence number.
+
+```javascript
+import { Kestrel } from '@dreamystify/kestrel';
+
+(async () => {
+  const kestrel = await Kestrel.initialize({
+    host: 'localhost',
+    port: 6379,
+    username: 'yourUsername',
+    password: 'yourPassword',
+  });
+
+  // Generate an ID
+  const id = await kestrel.getId();
+
+  // Decode a single ID
+  const decoded = Kestrel.decodeId(id);
+  console.log('Timestamp (ms since Unix epoch):', decoded.timestampMs);
+  console.log('Timestamp (ms since custom epoch):', decoded.timestamp);
+  console.log('Logical Shard ID:', decoded.logicalShardId); // 0-1023
+  console.log('Sequence:', decoded.sequence); // 0-4095
+  console.log('Created At:', decoded.createdAt); // JavaScript Date object
+
+  // Decode multiple IDs
+  const ids = await kestrel.getIds(5);
+  const decodedIds = Kestrel.decodeIds(ids);
+  decodedIds.forEach((d, index) => {
+    console.log(`ID ${index + 1}:`);
+    console.log(`  Created: ${d.createdAt.toISOString()}`);
+    console.log(`  Shard: ${d.logicalShardId}, Sequence: ${d.sequence}`);
+  });
+})();
+```
+
+The `decodeId` method accepts IDs as `bigint`, `string`, or `number`, making it
+easy to decode IDs from various sources (databases, APIs, etc.).
+
 ## Error Handling
 
 Kestrel emits events for errors. It is designed to let your application handle
