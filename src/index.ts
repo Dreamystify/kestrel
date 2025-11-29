@@ -6,10 +6,26 @@ import { EventEmitter } from 'events';
 // Extend the Redis and Cluster interfaces to include the generateIds method
 declare module 'ioredis' {
     interface Redis {
-        generateIds(...args: any[]): Promise<number[]>;
+        generateIds(
+            lockKey: string,
+            sequenceKey: string,
+            shardIdKey: string,
+            maxSequence: number,
+            minLogicalShardId: number,
+            maxLogicalShardId: number,
+            batch: number
+        ): Promise<number[]>;
     }
     interface Cluster {
-        generateIds(...args: any[]): Promise<number[]>;
+        generateIds(
+            lockKey: string,
+            sequenceKey: string,
+            shardIdKey: string,
+            maxSequence: number,
+            minLogicalShardId: number,
+            maxLogicalShardId: number,
+            batch: number
+        ): Promise<number[]>;
     }
 }
 
@@ -261,6 +277,7 @@ export class Kestrel extends EventEmitter {
 
     /**
      * Creates a new instance of the Kestrel library.
+     *
      * @param {KestrelConfig} [config] - Configuration for Redis connection.
      */
     constructor(config?: KestrelConfig) {
@@ -394,8 +411,9 @@ export class Kestrel extends EventEmitter {
 
     /**
      * Creates a new instance of the Kestrel library.
+     *
      * @param {KestrelConfig} [config] - Configuration for Redis connection.
-     * @returns {Promise<Kestrel>} - A promise that resolves to a new Kestrel instance.
+     * @returns {Promise<Kestrel>} A promise that resolves to a new Kestrel instance.
      */
     static async initialize(config?: KestrelConfig): Promise<Kestrel> {
         try {
@@ -405,21 +423,24 @@ export class Kestrel extends EventEmitter {
         } catch (err: unknown) {
             let errorMsg: string | undefined = 'Unknown Error';
         
-            if (err && typeof err === 'object' && 'message' in err && typeof (err as any).message === 'string') {
-                const message = (err as { message: string }).message;
-                if (message.includes('NOAUTH')) {
-                    errorMsg = 'No authentication provided.';
-                } else if (message.includes('WRONGPASS')) {
-                    errorMsg = 'Invalid username-password pair or user is disabled.';
-                } else if (
-                    message.includes('getaddrinfo ENOTFOUND') ||
-                    message.includes('getaddrinfo EAI_AGAIN invalid-host')
-                ) {
-                    errorMsg = 'Invalid host.';
-                } else if (message.includes('getaddrinfo ECONNREFUSED')) {
-                    errorMsg = 'Connection refused.';
-                } else {
-                    errorMsg = message;
+            if (err && typeof err === 'object' && 'message' in err) {
+                const errorWithMessage = err as { message: unknown };
+                if (typeof errorWithMessage.message === 'string') {
+                    const message = errorWithMessage.message;
+                    if (message.includes('NOAUTH')) {
+                        errorMsg = 'No authentication provided.';
+                    } else if (message.includes('WRONGPASS')) {
+                        errorMsg = 'Invalid username-password pair or user is disabled.';
+                    } else if (
+                        message.includes('getaddrinfo ENOTFOUND') ||
+                        message.includes('getaddrinfo EAI_AGAIN invalid-host')
+                    ) {
+                        errorMsg = 'Invalid host.';
+                    } else if (message.includes('getaddrinfo ECONNREFUSED')) {
+                        errorMsg = 'Connection refused.';
+                    } else {
+                        errorMsg = message;
+                    }
                 }
             } else {
                 errorMsg = `Unknown error: ${err}`;
@@ -444,10 +465,10 @@ export class Kestrel extends EventEmitter {
      * is not already in the "connecting" or "ready" state, it attempts to connect the client.
      * Any connection errors are caught, emitted as an "ERROR" event, and then rethrown.
      *
-     * @async
      * @private
+     * @async
      * @returns {Promise<void>} A promise that resolves once the event listeners are attached and
-     *                           the client is connected (if necessary).
+     *                          the client is connected (if necessary).
      */
     async #initEvents(): Promise<void> {
         const {
@@ -525,7 +546,12 @@ export class Kestrel extends EventEmitter {
 
     /**
      * Initializes the Redis connection and loads necessary Lua scripts.
+     *
      * Handles shard ID assignment in cluster mode.
+     *
+     * @private
+     * @async
+     * @returns {Promise<void>} A promise that resolves once initialization is complete.
      */
     async #init() {
         const {
@@ -605,9 +631,12 @@ export class Kestrel extends EventEmitter {
 
     /**
      * Creates a debounced version of a function that delays its execution.
+     *
+     * @private
+     * @template T
      * @param {T} func - The function to debounce.
      * @param {number} wait - The delay in milliseconds.
-     * @returns {(...args: Parameters<T>) => void} - The debounced function.
+     * @returns {(...args: Parameters<T>) => void} The debounced function.
      */
     #debounce<T extends (...args: any[]) => any>(func: T, wait: number): (...args: Parameters<T>) => void {
         let timeout: ReturnType<typeof setTimeout>;
@@ -619,8 +648,11 @@ export class Kestrel extends EventEmitter {
 
     /**
      * Loads the Lua script on a given Redis node.
+     *
+     * @private
+     * @async
      * @param {Redis} node - The Redis node to load the script on.
-     * @returns {Promise<string>} - The SHA of the loaded script.
+     * @returns {Promise<string>} The SHA of the loaded script.
      */
     async #loadScript(node: Redis): Promise<string> {
         const scriptSHA = crypto.createHash('sha1').update(this.#generateIdsScript).digest('hex');
@@ -633,8 +665,10 @@ export class Kestrel extends EventEmitter {
 
     /**
      * Generates a batch of unique IDs.
+     *
+     * @async
      * @param {number} [count=1] - The number of IDs to generate.
-     * @returns {Promise<bigint[]>} - An array of generated IDs.
+     * @returns {Promise<bigint[]>} An array of generated IDs.
      */
     async getIds(count: number = 1): Promise<bigint[]> {
         const batch = Math.min(Math.abs(count), MAX_BATCH_SIZE);
@@ -682,7 +716,9 @@ export class Kestrel extends EventEmitter {
                 //   * D is the sequence, 12 bits in total.
 
                 // compute the id
-                let id = bigInteger((timestamp - CUSTOM_EPOCH))
+                // Convert CUSTOM_EPOCH from seconds to milliseconds for the calculation
+                const customEpochMs = CUSTOM_EPOCH * ONE_MILLI_IN_MICRO_SECS;
+                let id = bigInteger((timestamp - customEpochMs))
                   .shiftLeft(TIMESTAMP_SHIFT)
                   .or(bigInteger(LOGICAL_SHARD_ID)
                   .shiftLeft(LOGICAL_SHARD_ID_SHIFT))
@@ -692,8 +728,9 @@ export class Kestrel extends EventEmitter {
             }
 
             return ids;
-        } catch (err: any) {
-            const error = new Error(`${err instanceof Error ? err.message : 'Unknown Error'}`);
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Unknown Error';
+            const error = new Error(errorMessage);
             this.emit(ERROR, { error });
             throw error;
         }
@@ -701,7 +738,9 @@ export class Kestrel extends EventEmitter {
 
     /**
      * Generates a single unique ID.
-     * @returns {Promise<bigint>} - The generated ID.
+     *
+     * @async
+     * @returns {Promise<bigint>} The generated ID.
      */
     async getId(): Promise<bigint> {
         const [id] = await this.getIds();
@@ -709,7 +748,110 @@ export class Kestrel extends EventEmitter {
     }
 
     /**
+     * Decodes a Kestrel ID into its component parts.
+     *
+     * This method reverses the ID generation process to extract:
+     * - The timestamp (milliseconds since custom epoch)
+     * - The logical shard ID
+     * - The sequence number
+     *
+     * @param {bigint | string | number} id - The ID to decode.
+     * @returns {Object} An object containing:
+     *   - timestamp: number - Timestamp in milliseconds since custom epoch
+     *   - timestampMs: number - Timestamp in milliseconds since Unix epoch (1970-01-01)
+     *   - logicalShardId: number - The logical shard ID (0-1023)
+     *   - sequence: number - The sequence number (0-4095)
+     *   - createdAt: Date - A Date object representing when the ID was created
+     *
+     * @example
+     * const id = await kestrel.getId();
+     * const decoded = Kestrel.decodeId(id);
+     * console.log(decoded.timestampMs); // Unix timestamp in milliseconds
+     * console.log(decoded.logicalShardId); // Shard ID
+     * console.log(decoded.sequence); // Sequence number
+     * console.log(decoded.createdAt); // JavaScript Date object
+     */
+    static decodeId(id: bigint | string | number): {
+        timestamp: number;
+        timestampMs: number;
+        logicalShardId: number;
+        sequence: number;
+        createdAt: Date;
+    } {
+        const [decoded] = Kestrel.decodeIds([id]);
+        return decoded;
+    }
+
+    /**
+     * Decodes an array of Kestrel IDs into their component parts.
+     *
+     * This method reverses the ID generation process for multiple IDs, extracting:
+     * - The timestamp (milliseconds since custom epoch)
+     * - The logical shard ID
+     * - The sequence number
+     *
+     * @param {(bigint | string | number)[]} ids - An array of IDs to decode.
+     * @returns {Array<Object>} An array of objects, each containing:
+     *   - timestamp: number - Timestamp in milliseconds since custom epoch
+     *   - timestampMs: number - Timestamp in milliseconds since Unix epoch (1970-01-01)
+     *   - logicalShardId: number - The logical shard ID (0-1023)
+     *   - sequence: number - The sequence number (0-4095)
+     *   - createdAt: Date - A Date object representing when the ID was created
+     *
+     * @example
+     * const ids = await kestrel.getIds(5);
+     * const decoded = Kestrel.decodeIds(ids);
+     * decoded.forEach(d => {
+     *   console.log(d.timestampMs); // Unix timestamp in milliseconds
+     *   console.log(d.logicalShardId); // Shard ID
+     *   console.log(d.sequence); // Sequence number
+     * });
+     */
+    static decodeIds(ids: (bigint | string | number)[]): Array<{
+        timestamp: number;
+        timestampMs: number;
+        logicalShardId: number;
+        sequence: number;
+        createdAt: Date;
+    }> {
+        return ids.map(id => {
+            // Convert input to bigint
+            const idBigInt = typeof id === 'bigint' ? id : BigInt(id);
+
+            // Extract sequence (12 bits) - rightmost bits
+            const sequenceMask = BigInt((1 << SEQUENCE_BITS) - 1); // 0xFFF = 4095
+            const sequence = Number(idBigInt & sequenceMask);
+
+            // Extract logical shard ID (10 bits) - bits 12-21
+            const logicalShardIdMask = BigInt((1 << LOGICAL_SHARD_ID_BITS) - 1); // 0x3FF = 1023
+            const logicalShardId = Number((idBigInt >> BigInt(LOGICAL_SHARD_ID_SHIFT)) & logicalShardIdMask);
+
+            // Extract timestamp (41 bits) - bits 22-62
+            // This is the timestamp in milliseconds since custom epoch
+            const timestampSinceEpoch = Number(idBigInt >> BigInt(TIMESTAMP_SHIFT));
+
+            // Convert timestamp from milliseconds since custom epoch to milliseconds since Unix epoch
+            // CUSTOM_EPOCH is in seconds, so we multiply by 1000 to convert to milliseconds
+            const timestampMs = timestampSinceEpoch + (CUSTOM_EPOCH * ONE_MILLI_IN_MICRO_SECS);
+
+            // Create Date object
+            const createdAt = new Date(timestampMs);
+
+            return {
+                timestamp: timestampSinceEpoch,
+                timestampMs,
+                logicalShardId,
+                sequence,
+                createdAt,
+            };
+        });
+    }
+
+    /**
      * Closes the Redis connection gracefully.
+     *
+     * @async
+     * @returns {Promise<void>} A promise that resolves once the connection is closed.
      */
     async close(): Promise<void> {
         const { READY, CONNECT, ERROR, DISCONNECTED } = KestrelEvents;
@@ -722,6 +864,8 @@ export class Kestrel extends EventEmitter {
         }
 
         const client = this.#client;
+        // Clear the reference after saving it to a local variable
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.#client = null as any;
         
         // Remove all event listeners from Redis client

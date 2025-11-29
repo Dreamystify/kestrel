@@ -118,6 +118,116 @@ describe('Kestrel', () => {
             });
         });
 
+        describe('decodeId function', () => {
+            it('should decode an ID into its component parts', async () => {
+                kestrel = await Kestrel.initialize();
+                const id = await kestrel.getId();
+                
+                const decoded = Kestrel.decodeId(id);
+                
+                // Verify all expected properties exist
+                expect(decoded).toHaveProperty('timestamp');
+                expect(decoded).toHaveProperty('timestampMs');
+                expect(decoded).toHaveProperty('logicalShardId');
+                expect(decoded).toHaveProperty('sequence');
+                expect(decoded).toHaveProperty('createdAt');
+                
+                // Verify types
+                expect(typeof decoded.timestamp).toBe('number');
+                expect(typeof decoded.timestampMs).toBe('number');
+                expect(typeof decoded.logicalShardId).toBe('number');
+                expect(typeof decoded.sequence).toBe('number');
+                expect(decoded.createdAt).toBeInstanceOf(Date);
+                
+                // Verify logical shard ID is within valid range (0-1023)
+                expect(decoded.logicalShardId).toBeGreaterThanOrEqual(0);
+                expect(decoded.logicalShardId).toBeLessThanOrEqual(1023);
+                
+                // Verify sequence is within valid range (0-4095)
+                expect(decoded.sequence).toBeGreaterThanOrEqual(0);
+                expect(decoded.sequence).toBeLessThanOrEqual(4095);
+                
+                // Verify timestamp is reasonable (should be recent, within last few seconds)
+                const now = Date.now();
+                const timeDiff = Math.abs(now - decoded.timestampMs);
+                expect(timeDiff).toBeLessThan(10000); // Within 10 seconds
+                
+                // Verify createdAt is a valid date
+                expect(decoded.createdAt.getTime()).toBe(decoded.timestampMs);
+            });
+
+            it('should decode IDs from different input types', async () => {
+                kestrel = await Kestrel.initialize();
+                const id = await kestrel.getId();
+                
+                // Test with bigint
+                const decoded1 = Kestrel.decodeId(id);
+                
+                // Test with string
+                const decoded2 = Kestrel.decodeId(id.toString());
+                
+                // Test with number (if within safe integer range)
+                if (id <= Number.MAX_SAFE_INTEGER) {
+                    const decoded3 = Kestrel.decodeId(Number(id));
+                    
+                    // All should produce the same result
+                    expect(decoded1.timestamp).toBe(decoded2.timestamp);
+                    expect(decoded1.timestamp).toBe(decoded3.timestamp);
+                    expect(decoded1.logicalShardId).toBe(decoded2.logicalShardId);
+                    expect(decoded1.logicalShardId).toBe(decoded3.logicalShardId);
+                    expect(decoded1.sequence).toBe(decoded2.sequence);
+                    expect(decoded1.sequence).toBe(decoded3.sequence);
+                }
+            });
+
+            it('should decode multiple IDs from a batch', async () => {
+                kestrel = await Kestrel.initialize();
+                const ids = await kestrel.getIds(5);
+                
+                const decoded = Kestrel.decodeIds(ids);
+                
+                // All IDs should have the same timestamp (generated in same batch)
+                const firstTimestamp = decoded[0].timestamp;
+                decoded.forEach(d => {
+                    expect(d.timestamp).toBe(firstTimestamp);
+                });
+                
+                // Sequences should be consecutive
+                const sequences = decoded.map(d => d.sequence).sort((a, b) => a - b);
+                for (let i = 1; i < sequences.length; i++) {
+                    expect(sequences[i] - sequences[i - 1]).toBeLessThanOrEqual(1);
+                }
+            });
+
+            it('should decode an array of IDs using decodeIds', async () => {
+                kestrel = await Kestrel.initialize();
+                const ids = await kestrel.getIds(3);
+                
+                const decoded = Kestrel.decodeIds(ids);
+                
+                // Should return an array of the same length
+                expect(decoded).toHaveLength(3);
+                
+                // Each decoded item should have all expected properties
+                decoded.forEach(d => {
+                    expect(d).toHaveProperty('timestamp');
+                    expect(d).toHaveProperty('timestampMs');
+                    expect(d).toHaveProperty('logicalShardId');
+                    expect(d).toHaveProperty('sequence');
+                    expect(d).toHaveProperty('createdAt');
+                    expect(d.createdAt).toBeInstanceOf(Date);
+                });
+                
+                // Verify decodeIds produces same results as decodeId
+                ids.forEach((id, index) => {
+                    const singleDecoded = Kestrel.decodeId(id);
+                    expect(decoded[index].timestamp).toBe(singleDecoded.timestamp);
+                    expect(decoded[index].logicalShardId).toBe(singleDecoded.logicalShardId);
+                    expect(decoded[index].sequence).toBe(singleDecoded.sequence);
+                });
+            });
+        });
+
         describe('Error handling', () => {
             it('should handle NOAUTH error', async () => {
                 const config = {
