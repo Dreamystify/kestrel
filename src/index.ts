@@ -13,7 +13,8 @@ declare module 'ioredis' {
             maxSequence: number,
             minLogicalShardId: number,
             maxLogicalShardId: number,
-            batch: number
+            batch: number,
+            nowMs: number
         ): Promise<number[]>;
     }
     interface Cluster {
@@ -24,7 +25,8 @@ declare module 'ioredis' {
             maxSequence: number,
             minLogicalShardId: number,
             maxLogicalShardId: number,
-            batch: number
+            batch: number,
+            nowMs: number
         ): Promise<number[]>;
     }
 }
@@ -41,15 +43,7 @@ local max_sequence = tonumber(ARGV[1])
 local min_logical_shard_id = tonumber(ARGV[2])
 local max_logical_shard_id = tonumber(ARGV[3])
 local num_ids = tonumber(ARGV[4])
-
-if redis.call('EXISTS', lock_key) == 1 then
-    redis.log(redis.LOG_NOTICE, 'Kestrel: Cannot generate ID, waiting for lock to expire.')
-    return redis.error_reply('Kestrel: Cannot generate ID, waiting for lock to expire.')
-end
-
--- Generate the IDs
-local end_sequence = redis.call('INCRBY', sequence_key, num_ids)
-local start_sequence = end_sequence - num_ids + 1
+local now_ms = tonumber(ARGV[5])
 local logical_shard_id = tonumber(redis.call('GET', logical_shard_id_key)) or -1
 
 -- Validate logical_shard_id is within the acceptable range
@@ -58,27 +52,51 @@ if logical_shard_id < min_logical_shard_id or logical_shard_id > max_logical_sha
     return redis.error_reply('Kestrel: Logical shard ID out of range')
 end
 
-if end_sequence >= max_sequence then
-    redis.log(redis.LOG_NOTICE, 'Kestrel: Rolling sequence back to the start, locking for 500ms.')
-    redis.call('SET', sequence_key, '-1')
-    redis.call('PSETEX', lock_key, 500, 'lock')
-    end_sequence = max_sequence
+-- Kestrel ID generation is Snowflake-style:
+-- - lock_key stores the last timestamp (ms) used to generate IDs
+-- - sequence_key stores the last sequence used for that timestamp
+-- This avoids global sequence wrap causing lockouts while keeping IDs monotonic.
+local last_ms = tonumber(redis.call('GET', lock_key)) or -1
+local last_seq = tonumber(redis.call('GET', sequence_key)) or -1
+
+local used_ms = now_ms
+if last_ms > used_ms then
+    used_ms = last_ms
 end
 
---[[
-The TIME command MUST be called after anything that mutates state, or the Redis server will error the script out.
-This is to ensure the script is "pure" in the sense that randomness or time based input will not change the
-outcome of the writes.
-See the "Scripts as pure functions" section at http://redis.io/commands/eval for more information.
---]]
-local time = redis.call('TIME')
+local start_sequence = 0
+local end_sequence = 0
+
+if used_ms == last_ms then
+    start_sequence = last_seq + 1
+    end_sequence = start_sequence + num_ids - 1
+
+    -- If we'd overflow the sequence space within the same ms, advance the ms and reset.
+    if end_sequence > max_sequence then
+        used_ms = used_ms + 1
+        start_sequence = 0
+        end_sequence = num_ids - 1
+    end
+else
+    -- New millisecond (or first run): reset sequence to 0.
+    start_sequence = 0
+    end_sequence = num_ids - 1
+end
+
+redis.call('SET', lock_key, used_ms)
+redis.call('SET', sequence_key, end_sequence)
+
+-- Return time in the same shape as Redis TIME (seconds + microseconds) so
+-- the JS side can keep using the same timestamp math.
+local time_seconds = math.floor(used_ms / 1000)
+local time_microseconds = (used_ms % 1000) * 1000
 
 return {
     start_sequence,
-    end_sequence, -- Doesn't need conversion, the result of INCR or the variable set is always a number.
+    end_sequence,
     logical_shard_id,
-    tonumber(time[1]),
-    tonumber(time[2])
+    time_seconds,
+    time_microseconds
 }
 `;
 
@@ -246,11 +264,14 @@ type RedisEvents = {
    // "wait" | "reconnecting" | "connecting" | "connect" | "ready" | "close" | "end";
 }
 
-// shard name and id for single use
-const KESTREL_SHARD_ID_KEY: string = process.env.KESTREL_SHARD_ID_KEY ?? `{kestrel}-shard-id`;
+// Redis Hash Tags ({tag}) are used here to ensure all keys map to the same hash slot in Redis Cluster.
+// This is required for the Lua script to execute atomically on a single node.
 const KESTREL_SHARD_ID: string = process.env.KESTREL_SHARD_ID ?? '1';
-const KESTREL_LOCK_KEY = '{kestrel}-generator-lock';
-const KESTREL_SEQUENCE_KEY = '{kestrel}-generator-sequence';
+const KESTREL_SHARD_ID_KEY: string = process.env.KESTREL_SHARD_ID_KEY ?? `{kestrel}-shard-id`;
+// NOTE: Historical name: this key no longer represents a "lock".
+// It stores the last millisecond timestamp used to generate IDs (Snowflake-style).
+const KESTREL_LOCK_KEY: string = process.env.KESTREL_LOCK_KEY ?? '{kestrel}-generator-lock';
+const KESTREL_SEQUENCE_KEY: string = process.env.KESTREL_SEQUENCE_KEY ?? '{kestrel}-generator-sequence';
 
 // We specify an custom epoch that we will use to fit our timestamps within the bounds of the 41 bits we have
 // available. This gives us a range of ~69 years within which we can generate IDs.
@@ -675,6 +696,7 @@ export class Kestrel extends EventEmitter {
         const { ERROR } = KestrelEvents;
 
         try {
+            const nowMs = Date.now();
             // Get the numbers to create the IDs
             const reply: number[] = await (this.#client).generateIds(
                 // First 3 arguments are KEYS:
@@ -685,7 +707,8 @@ export class Kestrel extends EventEmitter {
                 MAX_SEQUENCE,
                 MIN_LOGICAL_SHARD_ID,
                 MAX_LOGICAL_SHARD_ID,
-                batch
+                batch,
+                nowMs
             );
 
             // format the results
