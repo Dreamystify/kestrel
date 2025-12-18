@@ -22,7 +22,8 @@
 ### Prerequisites
 
 - Node.js v20+ (ES modules support required)
-- Redis v7+ (or a Redis Cluster for distributed mode)
+- Redis v7+ (standalone), or Redis Sentinel / Redis Cluster (optional modes)
+- Docker + Docker Compose (for the included local Sentinel/Cluster test stacks)
 
 ```sh
 # Initialize the repo (if applicable)

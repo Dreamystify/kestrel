@@ -420,8 +420,10 @@ describe('Kestrel', () => {
                     password: 'kestrel',
                 };
 
-                // Test that the configuration is valid (doesn't throw immediately)
-                expect(() => new Kestrel(config)).not.toThrow();
+                // Creating the instance also creates a Redis client; ensure we close it to avoid
+                // leaving open handles/timers that keep Jest running.
+                const kestrelInstance = new Kestrel(config);
+                await expect(kestrelInstance.close()).resolves.not.toThrow();
             });
         });
 
