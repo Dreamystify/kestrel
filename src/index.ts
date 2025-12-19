@@ -307,7 +307,15 @@ export class Kestrel extends EventEmitter {
         const { 
             CLIENT_CREATED, 
             RECONNECTION_ATTEMPTS_REACHED,
+            ERROR,
         } = KestrelEvents;
+
+        // Prevent Node's default EventEmitter behavior from crashing the process when an 'error'
+        // event is emitted before consumers have attached listeners (common during initialize()).
+        // Consumers can still attach their own 'error' listener; this just ensures there is at least one.
+        if (this.listenerCount(ERROR) === 0) {
+            this.on(ERROR, () => {});
+        }
 
         const defaultRetryStrategy = (times: number): number | null => {
             if (times > 10) {
@@ -437,20 +445,11 @@ export class Kestrel extends EventEmitter {
      * @returns {Promise<Kestrel>} A promise that resolves to a new Kestrel instance.
      */
     static async initialize(config?: KestrelConfig): Promise<Kestrel> {
-        let instance: Kestrel | null = null;
         try {
-            instance = new Kestrel(config);
+            const instance = new Kestrel(config);
             await instance.#init();
             return instance;
         } catch (err: unknown) {
-            // If initialization fails after creating a Redis client, ensure we tear it down.
-            // This avoids leaking sockets/retry timers (which can keep Node/Jest running).
-            try {
-                await instance?.close();
-            } catch {
-                // Ignore cleanup errors; we want to surface the original init failure.
-            }
-
             let errorMsg: string | undefined = 'Unknown Error';
         
             if (err && typeof err === 'object' && 'message' in err) {
@@ -514,12 +513,6 @@ export class Kestrel extends EventEmitter {
             ERROR,
         } = KestrelEvents;
 
-        const client = this.#client;
-        if (!client) {
-            // Nothing to initialize.
-            return;
-        }
-
         const errorHandler = (error: Error) => {
             this.emit(ERROR, { error });
         };
@@ -540,42 +533,42 @@ export class Kestrel extends EventEmitter {
         // Attach the non-error events.
         for (const event in redisEvents) {
             const eventKey = event as keyof typeof redisEvents;
-            client.on(eventKey, redisEvents[eventKey] as (...args: any[]) => void);
+            this.#client?.on(eventKey, redisEvents[eventKey] as (...args: any[]) => void);
         }
 
         // Attach the error handler for lifecycle errors.
-        client.on('error', errorHandler as (...args: any[]) => void);
+        this.#client?.on('error', errorHandler as (...args: any[]) => void);
 
         // Use a promise to handle the initial connection 
         // while temporarily suspending the error handler.
         return new Promise((resolve, reject) => {
-            client.off('error', errorHandler as (...args: any[]) => void);
+            this.#client.off('error', errorHandler as (...args: any[]) => void);
 
-            const cleanup = () => {
-                client.off('ready', onReady);
-                client.off('error', onError);
-            };
-            
             const onReady = () => {
                 cleanup();
-                client.on('error', errorHandler as (...args: any[]) => void);
+                this.#client.on('error', errorHandler as (...args: any[]) => void);
                 resolve();
             };
 
             const onError = (error: Error) => {
                 cleanup();
-                client.on('error', errorHandler as (...args: any[]) => void);
-                client.disconnect();
+                this.#client.on('error', errorHandler as (...args: any[]) => void);
+                this.#client.disconnect();
                 reject(error);
             };
 
-            client.once('ready', onReady);
-            client.once('error', onError);
+            const cleanup = () => {
+                this.#client.off('ready', onReady);
+                this.#client.off('error', onError);
+            };
+
+            this.#client.once('ready', onReady);
+            this.#client.once('error', onError);
 
             // Check if the client is already connected or connecting, if so, skip connecting again.
             const states: string[] = [READY, CONNECTING, CONNECT, RECONNECTING];
-            if (!states.includes(client.status)) {
-                client.connect().catch(onError);
+            if (!states.includes(this.#client.status)) {
+                this.#client.connect().catch(onError);
             }
         });
     }

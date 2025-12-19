@@ -261,13 +261,19 @@ ahoy stop
 ### Testing Sentinel and Cluster
 
 ```sh
-# Start the testing environment
+# Start Redis containers (standalone + sentinel + cluster) and wait until they're ready
 ahoy start
 
-# Check docker logs
+# Run the Sentinel harness (uses tests/sentinel.js)
+ahoy sentinel
+
+# Run the Cluster harness (uses tests/cluster.js)
+ahoy cluster
+
+# Inspect harness container logs (if needed)
 ahoy logs
 
-# Stop the testing environment
+# Stop containers
 ahoy stop
 ```
 
