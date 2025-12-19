@@ -1,3 +1,13 @@
+## [1.3.1](https://github.com/Dreamystify/kestrel/compare/v1.3.0...v1.3.1) (2025-12-19)
+
+### Bug Fixes
+
+* **test:** add ahoy sentinel/cluster and stabilize harness ([c7a90ac](https://github.com/Dreamystify/kestrel/commit/c7a90ac4a48448ae2b8ef6251adb2c3d1d09edf6))
+* **testing:** cleanup init failures and close cluster test ([ab09e4e](https://github.com/Dreamystify/kestrel/commit/ab09e4e72a687e1dfc19da30bac5ab7f45042701))
+* cleanup kestrel init failures ([f361ab8](https://github.com/Dreamystify/kestrel/commit/f361ab8dc43817eb3972327a24f7d62e75f431a7))
+* prevent id generator lockouts on wrap ([0f242e8](https://github.com/Dreamystify/kestrel/commit/0f242e87cc9a9805f7d723cb7a7ca7483ed0aeb8))
+* prevent kestrel id lockouts and stabilize tests/docs ([4db5cd4](https://github.com/Dreamystify/kestrel/commit/4db5cd4adb3e78b46b32b6493f3886a1677f7d0d))
+
 # [1.3.0](https://github.com/Dreamystify/kestrel/compare/v1.2.1...v1.3.0) (2025-11-29)
 
 ### Features
