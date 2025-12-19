@@ -29,7 +29,7 @@ Demonstrates decoding Kestrel IDs in Node.js (ES modules):
 
 ```bash
 # From project root
-npm ci
+npm install
 
 # Build first (the example imports from ../lib/index.mjs)
 npm run build

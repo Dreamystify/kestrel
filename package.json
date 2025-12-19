@@ -21,6 +21,7 @@
   "scripts": {
     "prepublishOnly": "npm run build",
     "build": "npm run clean && tsup",
+    "example:decode": "npm run build && node examples/decode-typescript.mjs",
     "lint": "npm run lint:md && npm run lint:mdc",
     "lint:md": "markdownlint 'docs/**/*.md' 'README.md' --fix",
     "lint:md:check": "markdownlint 'docs/**/*.md' 'README.md'",
