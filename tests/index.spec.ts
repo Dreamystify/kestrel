@@ -116,6 +116,27 @@ describe('Kestrel', () => {
                     expect(typeof id).toBe('bigint');
                 });
             });
+
+            it('should generate more than 4096 IDs without lockouts or duplicates', async () => {
+                kestrel = await Kestrel.initialize();
+
+                // Historically, Kestrel used a global 12-bit sequence and would lock/error on wrap (~4096 IDs).
+                // This test ensures we can cross that boundary safely.
+                const firstBatch = await kestrel.getIds(4096);
+                const secondBatch = await kestrel.getIds(50);
+
+                const ids = [...firstBatch, ...secondBatch];
+                expect(ids).toHaveLength(4096 + 50);
+
+                // Uniqueness
+                const unique = new Set(ids.map(id => id.toString()));
+                expect(unique.size).toBe(ids.length);
+
+                // Monotonicity (in generation order)
+                for (let i = 1; i < ids.length; i++) {
+                    expect(ids[i] > ids[i - 1]).toBe(true);
+                }
+            });
         });
 
         describe('decodeId function', () => {
@@ -226,6 +247,70 @@ describe('Kestrel', () => {
                     expect(decoded[index].sequence).toBe(singleDecoded.sequence);
                 });
             });
+
+            it('should correctly decode a known ID with exact values', () => {
+                // Test with a known ID to verify exact bit extraction
+                // This ID was constructed with:
+                // - timestamp_since_epoch: 1000000 (ms since custom epoch)
+                // - logical shard ID: 42
+                // - sequence: 123
+                // 
+                // ID construction (matching Kestrel's logic):
+                // (timestamp_since_epoch << 22) | (shard_id << 12) | sequence
+                // (1000000 << 22) | (42 << 12) | 123
+                // = 4194304000000 | 172032 | 123
+                // = 4194304172155
+                const timestampSinceEpoch = 1000000;
+                const shardId = 42;
+                const sequence = 123;
+                const knownId = BigInt(timestampSinceEpoch) << BigInt(22) | 
+                                BigInt(shardId) << BigInt(12) | 
+                                BigInt(sequence);
+                
+                const decoded = Kestrel.decodeId(knownId);
+                
+                // Verify exact values match what we encoded
+                expect(decoded.timestamp).toBe(timestampSinceEpoch);
+                expect(decoded.logicalShardId).toBe(shardId);
+                expect(decoded.sequence).toBe(sequence);
+                
+                // Verify timestamp conversion to Unix epoch
+                const CUSTOM_EPOCH = 1451566800;
+                const expectedTimestampMs = timestampSinceEpoch + (CUSTOM_EPOCH * 1000);
+                expect(decoded.timestampMs).toBe(expectedTimestampMs);
+                
+                // Verify Date object
+                expect(decoded.createdAt.getTime()).toBe(expectedTimestampMs);
+            });
+
+            it('should correctly round-trip: generate then decode', async () => {
+                kestrel = await Kestrel.initialize();
+                
+                // Generate an ID
+                const id = await kestrel.getId();
+                
+                // Decode it
+                const decoded = Kestrel.decodeId(id);
+                
+                // Verify the decoded values are reasonable and consistent
+                expect(decoded.timestamp).toBeGreaterThan(0);
+                expect(decoded.logicalShardId).toBeGreaterThanOrEqual(0);
+                expect(decoded.logicalShardId).toBeLessThanOrEqual(1023);
+                expect(decoded.sequence).toBeGreaterThanOrEqual(0);
+                expect(decoded.sequence).toBeLessThanOrEqual(4095);
+                
+                // Verify timestamp is recent (within last minute)
+                const now = Date.now();
+                const timeDiff = Math.abs(now - decoded.timestampMs);
+                expect(timeDiff).toBeLessThan(60000);
+                
+                // Verify we can decode the same ID multiple times and get same result
+                const decoded2 = Kestrel.decodeId(id);
+                expect(decoded.timestamp).toBe(decoded2.timestamp);
+                expect(decoded.logicalShardId).toBe(decoded2.logicalShardId);
+                expect(decoded.sequence).toBe(decoded2.sequence);
+                expect(decoded.timestampMs).toBe(decoded2.timestampMs);
+            });
         });
 
         describe('Error handling', () => {
@@ -335,8 +420,10 @@ describe('Kestrel', () => {
                     password: 'kestrel',
                 };
 
-                // Test that the configuration is valid (doesn't throw immediately)
-                expect(() => new Kestrel(config)).not.toThrow();
+                // Creating the instance also creates a Redis client; ensure we close it to avoid
+                // leaving open handles/timers that keep Jest running.
+                const kestrelInstance = new Kestrel(config);
+                await expect(kestrelInstance.close()).resolves.not.toThrow();
             });
         });
 

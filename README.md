@@ -17,12 +17,35 @@
   </p>
 </div>
 
+## Overview
+
+Kestrel is for teams that want **globally unique, time-sortable IDs** in a Redis-backed system *and* want those IDs to be useful later in analytics.
+
+It’s a good fit for:
+
+- **API + data platform teams**: generate IDs at write-time, then decode them in your warehouse/ETL jobs for time-based partitioning and debugging.
+- **Distributed systems**: multiple app instances can generate IDs without database round-trips, while preserving ordering by creation time.
+
+What you get:
+
+- **K-sortable 64-bit IDs**: IDs sort by creation time (milliseconds since a custom epoch).
+- **Embedded metadata**: each ID encodes:
+  - timestamp (ms)
+  - logical shard id
+  - per-millisecond sequence (0–4095)
+- **Decoding utilities**: `Kestrel.decodeId()` / `Kestrel.decodeIds()` to extract timestamp/shard/sequence for:
+  - **data warehousing** (e.g., derive `created_at`, partition keys, time-window rollups)
+  - **ETL/observability** (e.g., detect hot shards, analyze write bursts, investigate gaps)
+
+See [`examples/`](./examples) for decode-focused scripts you can drop into warehouse/ETL workflows.
+
 ## Getting started
 
 ### Prerequisites
 
 - Node.js v20+ (ES modules support required)
-- Redis v7+ (or a Redis Cluster for distributed mode)
+- Redis v7+ (standalone), or Redis Sentinel / Redis Cluster (optional modes)
+- Docker + Docker Compose (for the included local Sentinel/Cluster test stacks)
 
 ```sh
 # Initialize the repo (if applicable)
@@ -260,13 +283,19 @@ ahoy stop
 ### Testing Sentinel and Cluster
 
 ```sh
-# Start the testing environment
+# Start Redis containers (standalone + sentinel + cluster) and wait until they're ready
 ahoy start
 
-# Check docker logs
+# Run the Sentinel harness (uses tests/sentinel.js)
+ahoy sentinel
+
+# Run the Cluster harness (uses tests/cluster.js)
+ahoy cluster
+
+# Inspect harness container logs (if needed)
 ahoy logs
 
-# Stop the testing environment
+# Stop containers
 ahoy stop
 ```
 

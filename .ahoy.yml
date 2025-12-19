@@ -103,7 +103,51 @@ commands:
     cmd: |
       clear
       npm run build
-      docker compose up -d
+      # Bring up Redis stacks (but do not run the JS test harness containers).
+      docker compose up -d \
+        redis-standalone \
+        redis-sentinel-master redis-sentinel-slave redis-sentinel \
+        redis-cluster-node1 redis-cluster-node2 redis-cluster-node3
+
+  sentinel:
+    usage: Run the Sentinel test harness (tests/sentinel.js)
+    cmd: |
+      clear
+      npm run build
+      # Sentinel stack should already be running via `ahoy start`, but if it isn't, start it.
+      if ! docker compose ps -q redis-sentinel >/dev/null 2>&1 || [ -z "$(docker compose ps -q redis-sentinel)" ]; then
+        docker compose up -d redis-sentinel-master redis-sentinel-slave redis-sentinel
+      fi
+
+      # Restart to ensure sentinel picks up any local sentinel.conf changes
+      docker compose restart redis-sentinel
+
+      # Wait until Sentinel is reachable (avoids flaky "all sentinels unreachable" on startup)
+      until docker exec redis-sentinel redis-cli -p 26379 --user default -a kestrel PING >/dev/null 2>&1; do
+        sleep 0.2
+      done
+      until docker exec redis-sentinel redis-cli -p 26379 --user default -a kestrel SENTINEL get-master-addr-by-name mymaster >/dev/null 2>&1; do
+        sleep 0.2
+      done
+
+      docker compose up --no-deps sentinel-test
+
+  cluster:
+    usage: Run the Cluster test harness (tests/cluster.js)
+    cmd: |
+      clear
+      npm run build
+      # Cluster nodes should already be running via `ahoy start`, but if they aren't, start them.
+      if ! docker compose ps -q redis-cluster-node1 >/dev/null 2>&1 || [ -z "$(docker compose ps -q redis-cluster-node1)" ]; then
+        docker compose up -d redis-cluster-node1 redis-cluster-node2 redis-cluster-node3
+      fi
+
+      # Create cluster topology (one-time job) then run the test harness.
+      docker compose up --no-deps redis-cluster-setup || true
+      until docker exec redis-cluster-node1 redis-cli -a kestrel CLUSTER INFO 2>/dev/null | grep -q "cluster_state:ok"; do
+        sleep 0.2
+      done
+      docker compose up --no-deps cluster-test
 
   stop:
     usage: Down the docker containers
