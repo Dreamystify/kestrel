@@ -67,6 +67,36 @@ pip install pandas
 python3 examples/decode-python.py
 ```
 
+### SQL (PostgreSQL) (`decode-sql.sql`)
+
+Demonstrates decoding Kestrel IDs directly in SQL for analytics/ETL use cases:
+
+- Decode a single ID literal
+- Batch decode an array of IDs
+- Decode IDs stored in a table column (e.g., TEXT or BIGINT)
+
+**Usage:**
+
+```bash
+# From project root (Postgres):
+psql "$DATABASE_URL" -f examples/decode-sql.sql
+```
+
+### SQL (MySQL/TiDB) (`decode-mysql.sql`)
+
+Demonstrates decoding Kestrel IDs in MySQL-compatible SQL (including TiDB):
+
+- Same bit shifts/masks as Postgres
+- Uses `FROM_UNIXTIME()` for `created_at`
+- Assumes IDs are stored as `BIGINT`
+- Provided as runnable `SELECT` patterns (MySQL does not support table-returning functions)
+
+**Usage:**
+
+```bash
+mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < examples/decode-mysql.sql
+```
+
 ## Use Cases
 
 ### Data Warehousing
